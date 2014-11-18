@@ -31,11 +31,11 @@ using namespace std;
 using namespace qcc;
 using namespace ajn;
 
-TellientDevFactory devFactory ;
+TellientDevFactory devFactory;
 
 /*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.Analytics.tellient" ;
-static const char* SERVICE_NAME = "org.alljoyn.Analytics.tellient"; 
+static const char* INTERFACE_NAME = "org.alljoyn.Analytics.tellient";
+static const char* SERVICE_NAME = "org.alljoyn.Analytics.tellient";
 static const char* SERVICE_PATH = "/analytics";
 static const SessionPort SERVICE_PORT = 25;
 

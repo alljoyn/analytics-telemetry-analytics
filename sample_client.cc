@@ -43,8 +43,8 @@ using namespace ajn;
 static BusAttachment* g_msgBus = NULL;
 
 /*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.Analytics.tellient" ;
-static const char* SERVICE_NAME = "org.alljoyn.Analytics.tellient" ;
+static const char* INTERFACE_NAME = "org.alljoyn.Analytics.tellient";
+static const char* SERVICE_NAME = "org.alljoyn.Analytics.tellient";
 static const char* SERVICE_PATH = "/analytics";
 static const SessionPort SERVICE_PORT = 25;
 
@@ -177,89 +177,89 @@ QStatus MakeMethodCalls(void)
 
     Message reply(*g_msgBus);
 
-    MsgArg args[5] ;
-    MsgArg kv[10] ;
-    MsgArg variant ;
-    QStatus status ;
+    MsgArg args[5];
+    MsgArg kv[10];
+    MsgArg variant;
+    QStatus status;
 
     // call SetVendorData method.  It takes one parameter, an array of
     // string-variant pairs.  For tellient, this list must include
     // manufacturer_id, post_url, and device model.
-    variant.Set("i", 1337) ;
-    kv[0].Set("{sv}", "manufacturer_id", &variant) ;
-    kv[0].Stabilize() ;
+    variant.Set("i", 1337);
+    kv[0].Set("{sv}", "manufacturer_id", &variant);
+    kv[0].Stabilize();
 
-    variant.Set("s", "http://localhost/teupdate") ;
-    kv[1].Set("{sv}", "post_url", &variant) ;
-    kv[1].Stabilize() ;
+    variant.Set("s", "http://localhost/teupdate");
+    kv[1].Set("{sv}", "post_url", &variant);
+    kv[1].Stabilize();
 
-    variant.Set("s", "bass-o-matic") ;
-    kv[2].Set("{sv}", "model", &variant) ;
-    kv[2].Stabilize() ;
+    variant.Set("s", "bass-o-matic");
+    kv[2].Set("{sv}", "model", &variant);
+    kv[2].Stabilize();
 
-    args[0].Set("a{sv}", 3, kv) ;
+    args[0].Set("a{sv}", 3, kv);
 
     status = remoteObj.MethodCall(SERVICE_NAME, "SetVendorData", args, 1, reply, 5000);
 
-    const char *err ;
+    const char *err;
 
     if (ER_OK == status) {
-        printf("SetVendorData success\n") ;
+        printf("SetVendorData success\n");
     } else {
-	err = reply->GetErrorDescription().c_str() ;
-        printf("SetVendorData failed with %s.\n",err) ;
-	return status ;
+	err = reply->GetErrorDescription().c_str();
+        printf("SetVendorData failed with %s.\n",err);
+	return status;
     }
 
     // call SetDeviceData method.  This defines device data that is the
     // same for all events.  Typically this will include model version
     // strings, etc.
 
-    variant.Set("s", "102") ;
-    kv[0].Set("{sv}", "modelVer", &variant) ;
-    kv[0].Stabilize() ;
+    variant.Set("s", "102");
+    kv[0].Set("{sv}", "modelVer", &variant);
+    kv[0].Stabilize();
 
-    variant.Set("s", "Jasper") ;
-    kv[1].Set("{sv}", "dogname", &variant) ;
-    kv[1].Stabilize() ;
+    variant.Set("s", "Jasper");
+    kv[1].Set("{sv}", "dogname", &variant);
+    kv[1].Stabilize();
 
-    args[0].Set("a{sv}", 2, kv) ;
+    args[0].Set("a{sv}", 2, kv);
 
     status = remoteObj.MethodCall(SERVICE_NAME, "SetDeviceData", args, 1, reply, 5000);
 
     if (ER_OK == status) {
-        printf("SetDeviceData success\n") ;
+        printf("SetDeviceData success\n");
     } else {
-	err = reply->GetErrorDescription().c_str() ;
-        printf("SetDeviceData failed with %s.\n", err) ;
-	return status ;
+	err = reply->GetErrorDescription().c_str();
+        printf("SetDeviceData failed with %s.\n", err);
+	return status;
     }
 
     // send a few events.
 
-    uint32_t sequence = 0 ;
+    uint32_t sequence = 0;
     for (int i = 0 ; i < 3 ; i++) {
-	args[0].Set("s", "fakeeventname") ;
-	args[1].Set("t", 0LL) ;  // timestamp 
-	args[2].Set("u", sequence++) ; 
+	args[0].Set("s", "fakeeventname");
+	args[1].Set("t", 0LL) ;  // timestamp
+	args[2].Set("u", sequence++);
 
-	variant.Set("s", "shiny") ;
-	kv[0].Set("{sv}", "description", &variant) ;
-	kv[0].Stabilize() ;
+	variant.Set("s", "shiny");
+	kv[0].Set("{sv}", "description", &variant);
+	kv[0].Stabilize();
 
-	variant.Set("i", 98) ;
-	kv[1].Set("{sv}", "temperature", &variant) ;
-	kv[1].Stabilize() ;
+	variant.Set("i", 98);
+	kv[1].Set("{sv}", "temperature", &variant);
+	kv[1].Stabilize();
 
-	args[3].Set("a{sv}", 2, kv) ;
+	args[3].Set("a{sv}", 2, kv);
 
 	status = remoteObj.MethodCall(SERVICE_NAME, "SubmitEvent", args, 4, reply, 5000);
 	if (ER_OK == status) {
-	    printf("%s success\n", "SubmitEvent") ;
+	    printf("%s success\n", "SubmitEvent");
 	} else {
-	    err = reply->GetErrorDescription().c_str() ;
-	    printf("SetVendorData failed with %s.\n", err) ;
-	    return status ;
+	    err = reply->GetErrorDescription().c_str();
+	    printf("SetVendorData failed with %s.\n", err);
+	    return status;
 	}
     }
 
@@ -268,15 +268,15 @@ QStatus MakeMethodCalls(void)
     status = remoteObj.MethodCall(SERVICE_NAME, "RequestDelivery", args, 0, reply, 5000);
 
     if (ER_OK == status) {
-        printf("RequestDelivery success\n") ;
+        printf("RequestDelivery success\n");
     } else {
-	err = reply->GetErrorDescription().c_str() ;
-        printf("RequestDelivery failed with %s.\n", err) ;
-	return status ;
+	err = reply->GetErrorDescription().c_str();
+        printf("RequestDelivery failed with %s.\n", err);
+	return status;
     }
 
 
-    return ER_OK ;
+    return ER_OK;
 }
 
 /** Main entry point */
