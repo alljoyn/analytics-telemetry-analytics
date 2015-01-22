@@ -53,11 +53,11 @@
 #define FIELD_KVDOUBLEVAL  fieldtag(5, FIXED64)
 
 #if TE_TIMESTAMP_BITS == 64
-    #define TIMESTAMP_WIRELENGTH_FUNC wirelength_int64
-    #define TIMESTAMP_WRITE_FUNC write_int64
+#define TIMESTAMP_WIRELENGTH_FUNC wirelength_int64
+#define TIMESTAMP_WRITE_FUNC write_int64
 #else
-    #define TIMESTAMP_WIRELENGTH_FUNC wirelength_int32
-    #define TIMESTAMP_WRITE_FUNC write_int32
+#define TIMESTAMP_WIRELENGTH_FUNC wirelength_int32
+#define TIMESTAMP_WRITE_FUNC write_int32
 #endif
 
 
@@ -70,8 +70,7 @@
 
 
 #if TE_ALLOW_REALLOC
-/* assure_space implementation for the reallocing buffer manager.
- */
+/* assure_space implementation for the reallocing buffer manager.  */
 teErrType realloc_assure_space(teUpdateState *statep, unsigned needed)
 {
     int32_t size;
@@ -80,7 +79,7 @@ teErrType realloc_assure_space(teUpdateState *statep, unsigned needed)
 
     size = statep->buf_size;
     if (0 == size) {
-	size = 1024;
+        size = 1024;
         need_realloc = 1;
     }
 
@@ -91,8 +90,9 @@ teErrType realloc_assure_space(teUpdateState *statep, unsigned needed)
 
     if (need_realloc) {
         newbuf = (char *) TE_REALLOC((void*)statep->buf, size);
-        if (!newbuf)
+        if (!newbuf) {
             return TE_ERR_ALLOC;
+        }
 
         statep->buf = newbuf;
         statep->buf_size = size;
@@ -106,10 +106,12 @@ teErrType realloc_assure_space(teUpdateState *statep, unsigned needed)
 /* implementation for assure_space for the fixed buffer BufferManager. */
 teErrType fixed_assure_space(teUpdateState *statep, unsigned needed)
 {
-    if (statep->used + needed > statep->buf_size)
+    if (statep->used + needed > statep->buf_size) {
         return TE_ERR_ALLOC;
-    else
+    }
+    else {
         return TE_SUCCESS;
+    }
 }
 
 /* implementation for write_byte for the realloc and fixed buffer BufferManagers
@@ -151,25 +153,25 @@ const teBufferManager *teReallocBufferManager = &_reallocator;
  * uval is an unsigned variable holding the value.
  */
 #define WRITE_VARINT(statep, uval) \
-        char b ; \
-        do { \
-            b = uval & 0x7f ; \
-            uval = uval >> 7 ; \
-            if (uval) { b |= 0x80 ; } \
-            statep->mgr->write_byte(statep, b) ; \
-        } while (uval) ; \
-        return TE_SUCCESS
+    char b; \
+do { \
+    b = uval & 0x7f; \
+    uval = uval >> 7; \
+    if (uval) { b |= 0x80; } \
+    statep->mgr->write_byte(statep, b); \
+} while (uval); \
+return TE_SUCCESS
 
 /* this macro is used to count the number of bytes in
  * the wire protocol to represent an unsigned value.
  */
 #define WIRELENGTH_VARINT(uval) \
-    unsigned count = 0 ; \
-    do { \
-        count++ ; \
-        uval >>=7 ; \
-    } while (uval) ; \
-    return count;
+    unsigned count = 0; \
+do { \
+    count++; \
+    uval >>=7; \
+} while (uval); \
+return count;
 
 static teErrType write_uint32(teUpdateState *statep, uint32_t value)
 {
@@ -253,12 +255,12 @@ static unsigned int wirelength_int64(int64_t value)
 #endif
 
 teErrType te_init_update(
-    teUpdateState *statep,
-    const teBufferManager *mgr,
-    void *buffer,
-    unsigned buf_size,
-    int32_t manufacturer_id,
-    const char *model)
+        teUpdateState *statep,
+        const teBufferManager *mgr,
+        void *buffer,
+        unsigned buf_size,
+        int32_t manufacturer_id,
+        const char *model)
 {
     int len_model;
     statep->mgr = mgr;
@@ -268,8 +270,9 @@ teErrType te_init_update(
     statep->hadError = 0;
 
     len_model = strlen(model);
-    if (TE_SUCCESS != statep->mgr->assure_space(statep, len_model + 40))
+    if (TE_SUCCESS != statep->mgr->assure_space(statep, len_model + 40)) {
         return TE_ERR_ALLOC;
+    }
 
     write_int32(statep, FIELD_UVERSION);
     write_int32(statep, PROTOVER);
@@ -287,14 +290,16 @@ teErrType te_init_update(
 }
 
 
-/* Calculates the wire size of a teKeyValue, not including the size header.
+/*
+ * Calculates the wire size of a teKeyValue, not including the size header.
  * _scratch[0] will be set to the total size.
  * _scratch[1] will be set to the byte length of the key string.
  * _scratch[2] will be set to the byte length of the value string, if any.
  */
 static void precalc_kv_size(teKeyValue *kv)
 {
-    int vallen ;   /* length of value part */
+    /* length of value part */
+    int vallen;
 
     kv->KVNAMELENGTH = strlen(kv->name);
     kv->KVLENGTH = 1+ kv->KVNAMELENGTH + wirelength_int32(kv->KVNAMELENGTH);
@@ -318,8 +323,8 @@ static void precalc_kv_size(teKeyValue *kv)
         case TE_I64:
             vallen = wirelength_sint64(kv->value.i64val);
             break;
-    }
 #endif
+    }
 
     kv->KVLENGTH += 1 + vallen;
 }
@@ -334,11 +339,11 @@ static void write_endian_bytes(teUpdateState *statep, const void *p, int nbytes)
     }
 #elif TE_BIG_ENDIAN
     int i;
-    for (i = nbytes-1 ; i >= 0 ; i--) {
+    for (i = nbytes-1; i >= 0; i--) {
         statep->mgr->write_byte(statep, cp[i]);
     }
 #else
-    #error must define TE_LITTLE_ENDIAN or TE_BIG_ENDIAN
+#error must define TE_LITTLE_ENDIAN or TE_BIG_ENDIAN
 #endif
 }
 
@@ -347,7 +352,6 @@ static void write_endian_bytes(teUpdateState *statep, const void *p, int nbytes)
  */
 static void write_kv(teUpdateState *statep, teKeyValue *kv)
 {
-
     write_int32(statep, FIELD_KVNAME);
     write_int32(statep, kv->KVNAMELENGTH);
     statep->mgr->write_bytes(statep, kv->name, kv->KVNAMELENGTH);
@@ -357,7 +361,7 @@ static void write_kv(teUpdateState *statep, teKeyValue *kv)
             write_int32(statep, FIELD_KVSVAL);
             write_int32(statep, kv->KVSVALLENGTH);
             statep->mgr->write_bytes(statep, kv->value.stringval,
-                        kv->KVSVALLENGTH);
+                    kv->KVSVALLENGTH);
             break;
         case TE_I32:
             write_int32(statep, FIELD_KVI32VAL);
@@ -384,14 +388,14 @@ static void write_kv(teUpdateState *statep, teKeyValue *kv)
 
 
 teErrType te_add_event(teUpdateState *statep, const char *name,
-       TE_TIMESTAMP_TYPE timestamp, int num_keys, teKeyValue kv[])
+        TE_TIMESTAMP_TYPE timestamp, int num_keys, teKeyValue kv[])
 {
     unsigned kv_length;
     unsigned event_length = 0;
     unsigned name_length;
     int i;
 
-    for (i = 0 ; i < num_keys ; i++) {
+    for (i = 0; i < num_keys; i++) {
         precalc_kv_size(&kv[i]);
 
         kv_length = kv[i].KVLENGTH;
@@ -406,11 +410,13 @@ teErrType te_add_event(teUpdateState *statep, const char *name,
 
     event_length += 1 + name_length + wirelength_int32(name_length);
 
-    if (timestamp)
+    if (timestamp) {
         event_length += 1 + TIMESTAMP_WIRELENGTH_FUNC(timestamp);
+    }
 
-    if (TE_SUCCESS != statep->mgr->assure_space(statep, event_length + 12) )
+    if (TE_SUCCESS != statep->mgr->assure_space(statep, event_length + 12) ) {
         return TE_ERR_ALLOC;
+    }
 
     /* we know the buffer is big enough, so start writing to it. */
 
@@ -426,7 +432,7 @@ teErrType te_add_event(teUpdateState *statep, const char *name,
         TIMESTAMP_WRITE_FUNC(statep, timestamp);
     }
 
-    for (i = 0 ; i < num_keys ; i++) {
+    for (i = 0; i < num_keys; i++) {
         write_int32(statep, FIELD_EKV);
         write_int32(statep, kv[i].KVLENGTH);
         write_kv(statep, &kv[i]);
@@ -439,8 +445,9 @@ static teErrType write_stringfield(teUpdateState *statep, int field, const char 
 {
     int len = strlen(val);
 
-    if (TE_SUCCESS != statep->mgr->assure_space(statep, len + 7) )
+    if (TE_SUCCESS != statep->mgr->assure_space(statep, len + 7) ) {
         return TE_ERR_ALLOC;
+    }
 
     write_int32(statep, field);
     write_int32(statep, len);
@@ -461,8 +468,9 @@ teErrType te_set_modelver(teUpdateState *statep, const char *val)
 
 teErrType te_set_timestamp(teUpdateState *statep, TE_TIMESTAMP_TYPE val)
 {
-    if (TE_SUCCESS != statep->mgr->assure_space(statep, 11))
+    if (TE_SUCCESS != statep->mgr->assure_space(statep, 11)) {
         return TE_ERR_ALLOC;
+    }
     write_int32(statep, FIELD_UTIMESTAMP);
     TIMESTAMP_WRITE_FUNC(statep, val);
     return TE_SUCCESS;
@@ -475,7 +483,7 @@ teErrType te_add_defaults(teUpdateState *statep,int num_keys,teKeyValue kv[])
     int i;
 
     len = 0;
-    for (i = 0 ; i < num_keys ; i++) {
+    for (i = 0; i < num_keys; i++) {
         precalc_kv_size(&kv[i]);
 
         len += 1 + kv[i].KVLENGTH + wirelength_int32(kv[i].KVLENGTH);
@@ -485,7 +493,7 @@ teErrType te_add_defaults(teUpdateState *statep,int num_keys,teKeyValue kv[])
         return TE_ERR_ALLOC;
     }
 
-    for (i = 0 ; i < num_keys ; i++) {
+    for (i = 0; i < num_keys; i++) {
         write_int32(statep, FIELD_UDEFAULT);
         write_int32(statep, kv[i].KVLENGTH);
         write_kv(statep, &kv[i]);

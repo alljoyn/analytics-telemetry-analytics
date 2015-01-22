@@ -43,13 +43,12 @@ using namespace ajn;
 static BusAttachment* g_msgBus = NULL;
 
 /*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.Analytics.tellient";
-static const char* SERVICE_NAME = "org.alljoyn.Analytics.tellient";
-static const char* SERVICE_PATH = "/analytics";
-static const SessionPort SERVICE_PORT = 25;
+static const char* INTERFACE_NAME = "org.alljoyn.AnalyticsEventAgent";
+static const char* SERVICE_PATH = "/analytics/example";
 
 static bool s_joinComplete = false;
 static SessionId s_sessionId = 0;
+static qcc::String s_busName;
 
 static volatile sig_atomic_t s_interrupt = false;
 
@@ -58,93 +57,43 @@ static void SigIntHandler(int sig)
     s_interrupt = true;
 }
 
-/** AllJoynListener receives discovery events from AllJoyn */
-class MyBusListener : public BusListener, public SessionListener {
-  public:
-    void FoundAdvertisedName(const char* name, TransportMask transport, const char* namePrefix)
-    {
-        if (0 == strcmp(name, SERVICE_NAME)) {
-            printf("FoundAdvertisedName(name='%s', prefix='%s')\n", name, namePrefix);
-
-            /* We found a remote bus that is advertising the analytics service's well-known name so connect to it. */
-            /* Since we are in a callback we must enable concurrent callbacks before calling a synchronous method. */
-            g_msgBus->EnableConcurrentCallbacks();
-            SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, false, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
-            QStatus status = g_msgBus->JoinSession(name, SERVICE_PORT, this, s_sessionId, opts);
-            if (ER_OK == status) {
-                printf("JoinSession SUCCESS (Session id=%d).\n", s_sessionId);
-            } else {
-                printf("JoinSession failed (status=%s).\n", QCC_StatusText(status));
-            }
-        }
-        s_joinComplete = true;
-    }
-
-    void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)
-    {
-        if (newOwner && (0 == strcmp(busName, SERVICE_NAME))) {
-            printf("NameOwnerChanged: name='%s', oldOwner='%s', newOwner='%s'.\n",
-                   busName,
-                   previousOwner ? previousOwner : "<none>",
-                   newOwner ? newOwner : "<none>");
-        }
+class MySessionListener : public SessionListener {
+    void SessionLost(SessionId sessionId, SessionLostReason reason) {
+        printf("SessionLost sessionId = %u, Reason = %d\n", sessionId, reason);
     }
 };
 
-
-/** Start the message bus, report the result to stdout, and return the result status. */
-QStatus StartMessageBus(void)
-{
-    QStatus status = g_msgBus->Start();
-
-    if (ER_OK == status) {
-        printf("BusAttachment started.\n");
-    } else {
-        printf("BusAttachment::Start failed.\n");
+class MyAboutListener : public AboutListener {
+    void Announced(const char* busName, uint16_t version, SessionPort port, 
+            const MsgArg& objectDescriptionArg, const MsgArg& aboutDataArg) 
+    {
+        AboutObjectDescription aod(objectDescriptionArg);
+        size_t intf_num = aod.GetInterfaces(SERVICE_PATH, NULL, 0);
+        const char** intfs = new const char*[intf_num];
+        aod.GetInterfaces(SERVICE_PATH, intfs, intf_num);
+        for (size_t j=0; j < intf_num; ++j) {
+            if (0 == strcmp(intfs[j], INTERFACE_NAME)) {
+                /* 
+                 * We found a remote bus that is advertising the analytics 
+                 * service's well-known name and the path we specified, so connect to it.
+                 * Since we are in a callback we must enable concurrent 
+                 * callbacks before calling a synchronous method. 
+                 */
+                g_msgBus->EnableConcurrentCallbacks();
+                SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, false, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
+                QStatus status = g_msgBus->JoinSession(busName, port, &sessionListener, s_sessionId, opts);
+                if (ER_OK == status) {
+                    printf("JoinSession SUCCESS (Session id=%d).\n", s_sessionId);
+                    s_busName = busName;
+                    s_joinComplete = true;
+                } else {
+                    printf("JoinSession failed (status=%s).\n", QCC_StatusText(status));
+                }
+            }
+        }
     }
-
-    return status;
-}
-
-/** Handle the connection to the bus, report the result to stdout, and return the result status. */
-QStatus ConnectToBus(void)
-{
-    QStatus status = g_msgBus->Connect();
-
-    if (ER_OK == status) {
-        printf("BusAttachment connected to '%s'.\n", g_msgBus->GetConnectSpec().c_str());
-    } else {
-        printf("BusAttachment::Connect('%s') failed.\n", g_msgBus->GetConnectSpec().c_str());
-    }
-
-    return status;
-}
-
-/** Register a bus listener in order to get discovery indications and report the event to stdout. */
-void RegisterBusListener(void)
-{
-    /* Static bus listener */
-    static MyBusListener s_busListener;
-
-    g_msgBus->RegisterBusListener(s_busListener);
-    printf("BusListener Registered.\n");
-}
-
-/** Begin discovery on the well-known name of the service to be called, report the result to
-   stdout, and return the result status. */
-QStatus FindAdvertisedName(void)
-{
-    /* Begin discovery on the well-known name of the service to be called */
-    QStatus status = g_msgBus->FindAdvertisedName(SERVICE_NAME);
-
-    if (status == ER_OK) {
-        printf("org.alljoyn.Bus.FindAdvertisedName ('%s') succeeded.\n", SERVICE_NAME);
-    } else {
-        printf("org.alljoyn.Bus.FindAdvertisedName ('%s') failed (%s).\n", SERVICE_NAME, QCC_StatusText(status));
-    }
-
-    return status;
-}
+    MySessionListener sessionListener;
+};
 
 /** Wait for join session to complete, report the event to stdout, and return the result status. */
 QStatus WaitForJoinSessionCompletion(void)
@@ -169,7 +118,7 @@ QStatus WaitForJoinSessionCompletion(void)
 /** make method calls and report to stdout */
 QStatus MakeMethodCalls(void)
 {
-    ProxyBusObject remoteObj(*g_msgBus, SERVICE_NAME, SERVICE_PATH, s_sessionId);
+    ProxyBusObject remoteObj(*g_msgBus, s_busName.c_str(), SERVICE_PATH, s_sessionId);
     const InterfaceDescription* alljoynTestIntf = g_msgBus->GetInterface(INTERFACE_NAME);
 
     assert(alljoynTestIntf);
@@ -182,9 +131,11 @@ QStatus MakeMethodCalls(void)
     MsgArg variant;
     QStatus status;
 
-    // call SetVendorData method.  It takes one parameter, an array of
-    // string-variant pairs.  For tellient, this list must include
-    // manufacturer_id, post_url, and device model.
+    /*
+     * call SetVendorData method.  It takes one parameter, an array of
+     * string-variant pairs.  For tellient, this list must include
+     * manufacturer_id, post_url, and device model.
+     */
     variant.Set("i", 1337);
     kv[0].Set("{sv}", "manufacturer_id", &variant);
     kv[0].Stabilize();
@@ -199,21 +150,23 @@ QStatus MakeMethodCalls(void)
 
     args[0].Set("a{sv}", 3, kv);
 
-    status = remoteObj.MethodCall(SERVICE_NAME, "SetVendorData", args, 1, reply, 5000);
+    status = remoteObj.MethodCall(INTERFACE_NAME, "SetVendorData", args, 1, reply, 5000);
 
     const char *err;
 
     if (ER_OK == status) {
         printf("SetVendorData success\n");
     } else {
-	err = reply->GetErrorDescription().c_str();
+        err = reply->GetErrorDescription().c_str();
         printf("SetVendorData failed with %s.\n",err);
-	return status;
+        return status;
     }
 
-    // call SetDeviceData method.  This defines device data that is the
-    // same for all events.  Typically this will include model version
-    // strings, etc.
+    /*
+     * call SetDeviceData method.  This defines device data that is the
+     * same for all events.  Typically this will include model version
+     * strings, etc.
+     */
 
     variant.Set("s", "102");
     kv[0].Set("{sv}", "modelVer", &variant);
@@ -225,54 +178,55 @@ QStatus MakeMethodCalls(void)
 
     args[0].Set("a{sv}", 2, kv);
 
-    status = remoteObj.MethodCall(SERVICE_NAME, "SetDeviceData", args, 1, reply, 5000);
+    status = remoteObj.MethodCall(INTERFACE_NAME, "SetDeviceData", args, 1, reply, 5000);
 
     if (ER_OK == status) {
         printf("SetDeviceData success\n");
     } else {
-	err = reply->GetErrorDescription().c_str();
+        err = reply->GetErrorDescription().c_str();
         printf("SetDeviceData failed with %s.\n", err);
-	return status;
+        return status;
     }
 
-    // send a few events.
+    /* send a few events. */
 
     uint32_t sequence = 0;
-    for (int i = 0 ; i < 3 ; i++) {
-	args[0].Set("s", "fakeeventname");
-	args[1].Set("t", 0LL) ;  // timestamp
-	args[2].Set("u", sequence++);
+    for (int i = 0; i < 3; i++) {
+        args[0].Set("s", "fakeeventname");
+        /* timestamp */
+        args[1].Set("t", 0LL);
+        args[2].Set("u", sequence++);
 
-	variant.Set("s", "shiny");
-	kv[0].Set("{sv}", "description", &variant);
-	kv[0].Stabilize();
+        variant.Set("s", "shiny");
+        kv[0].Set("{sv}", "description", &variant);
+        kv[0].Stabilize();
 
-	variant.Set("i", 98);
-	kv[1].Set("{sv}", "temperature", &variant);
-	kv[1].Stabilize();
+        variant.Set("i", 98);
+        kv[1].Set("{sv}", "temperature", &variant);
+        kv[1].Stabilize();
 
-	args[3].Set("a{sv}", 2, kv);
+        args[3].Set("a{sv}", 2, kv);
 
-	status = remoteObj.MethodCall(SERVICE_NAME, "SubmitEvent", args, 4, reply, 5000);
-	if (ER_OK == status) {
-	    printf("%s success\n", "SubmitEvent");
-	} else {
-	    err = reply->GetErrorDescription().c_str();
-	    printf("SetVendorData failed with %s.\n", err);
-	    return status;
-	}
+        status = remoteObj.MethodCall(INTERFACE_NAME, "SubmitEvent", args, 4, reply, 5000);
+        if (ER_OK == status) {
+            printf("%s success\n", "SubmitEvent");
+        } else {
+            err = reply->GetErrorDescription().c_str();
+            printf("SetVendorData failed with %s.\n", err);
+            return status;
+        }
     }
 
-    // request submission to service.
+    /* request submission to service. */
 
-    status = remoteObj.MethodCall(SERVICE_NAME, "RequestDelivery", args, 0, reply, 5000);
+    status = remoteObj.MethodCall(INTERFACE_NAME, "RequestDelivery", args, 0, reply, 5000);
 
     if (ER_OK == status) {
         printf("RequestDelivery success\n");
     } else {
-	err = reply->GetErrorDescription().c_str();
+        err = reply->GetErrorDescription().c_str();
         printf("RequestDelivery failed with %s.\n", err);
-	return status;
+        return status;
     }
 
 
@@ -291,45 +245,48 @@ int main(int argc, char** argv, char** envArg)
     QStatus status = ER_OK;
 
     /* Create message bus. */
-    g_msgBus = new BusAttachment("myApp", true);
+    BusAttachment bus("Analytics Client Example", true);
+    g_msgBus = &bus;
 
-    /* This test for NULL is only required if new() behavior is to return NULL
-     * instead of throwing an exception upon an out of memory failure.
-     */
-    if (!g_msgBus) {
-        status = ER_OUT_OF_MEMORY;
+    status = bus.Start();
+    if (ER_OK != status) {
+        printf("Failed to start bus attachment (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = AnalyticsBusObject::CreateInterface(*g_msgBus, INTERFACE_NAME);
+    status = bus.Connect();
+    if (ER_OK != status) {
+        printf("Failed to connect to router (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = StartMessageBus();
+    status = AnalyticsBusObject::CreateInterface(bus, INTERFACE_NAME);
+    if (ER_OK != status) {
+        printf("Failed to create AnalyticBusObject interface (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = ConnectToBus();
+    MyAboutListener aboutListener;
+    bus.RegisterAboutListener(aboutListener);
+
+    const char* interfaces[] = { INTERFACE_NAME };
+    status = bus.WhoImplements(interfaces, sizeof(interfaces) / sizeof(interfaces[0]));
+    if (ER_OK != status) {
+        printf("WhoImplements call FAILED with status %s\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        RegisterBusListener();
-        status = FindAdvertisedName();
+    status = WaitForJoinSessionCompletion();
+    if (ER_OK != status) {
+        printf("Failed to join session (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = WaitForJoinSessionCompletion();
+    status = MakeMethodCalls();
+    if (ER_OK != status) {
+        printf("Failed in MakeMethodCalls (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = MakeMethodCalls();
-    }
-
-    /* Deallocate bus */
-    delete g_msgBus;
-    g_msgBus = NULL;
-
-    printf("client exiting with status 0x%04x (%s).\n", status, QCC_StatusText(status));
-
-    return (int) status;
+    return EXIT_SUCCESS;
 }

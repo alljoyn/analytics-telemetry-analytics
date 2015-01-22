@@ -22,22 +22,22 @@ message KV {
 }
 
 message Event {
-    required string name = 1 ;
-    optional int64 timestamp = 2 ;
-    optional int32 sequence = 4 ;
-    repeated KV field = 15 ;
+    required string name = 1;
+    optional int64 timestamp = 2;
+    optional int32 sequence = 4;
+    repeated KV field = 15;
 
 }
 
 message Update {
     required int32 version = 1;
-    required int32 manufacturer_id = 2 ;
-    required string model = 3 ;
-    optional string device_id = 4 ;
-    optional string modelver = 5 ;
-    optional int32 sequence = 6 ;
+    required int32 manufacturer_id = 2;
+    required string model = 3;
+    optional string device_id = 4;
+    optional string modelver = 5;
+    optional int32 sequence = 6;
 
-    repeated KV event_default_value = 7 ;
-    repeated Event event = 8 ;
-    optional int64 timestamp = 15 ;
+    repeated KV event_default_value = 7;
+    repeated Event event = 8;
+    optional int64 timestamp = 15;
 }

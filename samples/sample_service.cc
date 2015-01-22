@@ -18,26 +18,47 @@
  *    ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
-#include <qcc/platform.h>
-
-#include <assert.h>
 #include <signal.h>
 #include <stdio.h>
 #include <vector>
 
+#include <qcc/platform.h>
+
+#include <alljoyn/BusAttachment.h>
+#include <alljoyn/BusObject.h>
+#include <alljoyn/AboutObj.h>
 #include "TellientAnalytics.h"
 
 using namespace std;
 using namespace qcc;
 using namespace ajn;
 
-TellientDevFactory devFactory;
-
 /*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.Analytics.tellient";
-static const char* SERVICE_NAME = "org.alljoyn.Analytics.tellient";
-static const char* SERVICE_PATH = "/analytics";
-static const SessionPort SERVICE_PORT = 25;
+static const char* INTERFACE_NAME = "org.alljoyn.AnalyticsEventAgent";
+
+/* 
+ * The service path may be used to help distinguish between multiple 
+ * instances of services advertising the Analytics interface. A trusted 
+ * relationship between client and service can be created by adding some 
+ * type of shared secret on the interface. That is not included in this example.
+ */
+static const char* SERVICE_PATH = "/analytics/example";
+
+/* The app id must is a UUID. Generate a new one for your own analytics service implementation. */
+static const uint8_t MY_APP_ID[] = {
+    0x01, 0x8e, 0xc2, 0x19, 
+    0x52, 0x9d, 0x49, 0x75,
+    0xbd, 0x6b, 0xe7, 0x06, 
+    0x88, 0x5a, 0x4e, 0x80
+};
+
+/* Likewise, this should be a unique identifier for the device running the service*/
+static const qcc::String MY_DEVICE_ID = "this device id";
+
+/* About assigned service port for About service */
+static const ajn::SessionPort ASSIGNED_SERVICE_PORT = 900;
+
+static const qcc::String DEFAULT_LANGUAGE = "en";
 
 static volatile sig_atomic_t s_interrupt = false;
 
@@ -46,117 +67,79 @@ static void SigIntHandler(int sig)
     s_interrupt = true;
 }
 
-class MyBusListener : public BusListener, public SessionPortListener {
-    void NameOwnerChanged(const char* busName, const char* previousOwner, const char* newOwner)
-    {
-        if (newOwner && (0 == strcmp(busName, SERVICE_NAME))) {
-            printf("NameOwnerChanged: name=%s, oldOwner=%s, newOwner=%s.\n",
-                   busName,
-                   previousOwner ? previousOwner : "<none>",
-                   newOwner ? newOwner : "<none>");
+class MySessionPortListener : public SessionPortListener {
+    public:
+        bool AcceptSessionJoiner(ajn::SessionPort sessionPort, const char* joiner, const ajn::SessionOpts& opts)
+        {
+            if (sessionPort != ASSIGNED_SERVICE_PORT) {
+                printf("Rejecting join attempt on unexpected session port %d.\n", sessionPort);
+                return false;
+            }
+            printf("Accepting join session request from %s (opts.proximity=%x, opts.traffic=%x, opts.transports=%x).\n",
+                    joiner, opts.proximity, opts.traffic, opts.transports);
+            return true;
         }
-    }
-    bool AcceptSessionJoiner(SessionPort sessionPort, const char* joiner, const SessionOpts& opts)
-    {
-        if (sessionPort != SERVICE_PORT) {
-            printf("Rejecting join attempt on unexpected session port %d.\n", sessionPort);
-            return false;
+        void SessionJoined(SessionPort sessionPort, SessionId id, const char* joiner)
+        {
+            printf("Session Joined SessionId = %u\n", id);
         }
-        printf("Accepting join session request from %s (opts.proximity=%x, opts.traffic=%x, opts.transports=%x).\n",
-               joiner, opts.proximity, opts.traffic, opts.transports);
-        return true;
-    }
 };
 
-/** The bus listener object. */
-static MyBusListener s_busListener;
-
-/** Top level message bus object. */
-static BusAttachment* s_msgBus = NULL;
-
-
-/** Register the bus object and connect, report the result to stdout, and return the status code. */
-QStatus RegisterBusObject(BusObject* obj)
+static QStatus FillAboutPropertyStoreImplData(AboutData& aboutData)
 {
-    QStatus status = s_msgBus->RegisterBusObject(*obj);
-
-    if (ER_OK == status) {
-        printf("RegisterBusObject succeeded.\n");
-    } else {
-        printf("RegisterBusObject failed (%s).\n", QCC_StatusText(status));
+    QStatus status = ER_OK;
+    status = aboutData.SetDeviceId(MY_DEVICE_ID.c_str());
+    if (status != ER_OK) {
+        return status;
+    }
+    status = aboutData.SetAppId(MY_APP_ID, 16);
+    if (status != ER_OK) {
+        return status;
     }
 
-    return status;
-}
-
-/** Connect, report the result to stdout, and return the status code. */
-QStatus ConnectBusAttachment(void)
-{
-    QStatus status = s_msgBus->Connect();
-
-    if (ER_OK == status) {
-        printf("Connect to '%s' succeeded.\n", s_msgBus->GetConnectSpec().c_str());
-    } else {
-        printf("Failed to connect to '%s' (%s).\n", s_msgBus->GetConnectSpec().c_str(), QCC_StatusText(status));
+    status = aboutData.SetAppName("Analytics service example");
+    if (status != ER_OK) {
+        return status;
     }
 
-    return status;
-}
-
-/** Start the message bus, report the result to stdout, and return the status code. */
-QStatus StartMessageBus(void)
-{
-    QStatus status = s_msgBus->Start();
-
-    if (ER_OK == status) {
-        printf("BusAttachment started.\n");
-    } else {
-        printf("Start of BusAttachment failed (%s).\n", QCC_StatusText(status));
+    status = aboutData.SetModelNumber("Wxfy388i");
+    if (status != ER_OK) {
+        return status;
     }
 
-    return status;
-}
-
-/** Create the session, report the result to stdout, and return the status code. */
-QStatus CreateSession(TransportMask mask)
-{
-    SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, false, SessionOpts::PROXIMITY_ANY, mask);
-    SessionPort sp = SERVICE_PORT;
-    QStatus status = s_msgBus->BindSessionPort(sp, opts, s_busListener);
-
-    if (ER_OK == status) {
-        printf("BindSessionPort succeeded.\n");
-    } else {
-        printf("BindSessionPort failed (%s).\n", QCC_StatusText(status));
+    status = aboutData.SetDateOfManufacture("2199-10-01");
+    if (status != ER_OK) {
+        return status;
     }
 
-    return status;
-}
-
-/** Advertise the service name, report the result to stdout, and return the status code. */
-QStatus AdvertiseName(TransportMask mask)
-{
-    QStatus status = s_msgBus->AdvertiseName(SERVICE_NAME, mask);
-
-    if (ER_OK == status) {
-        printf("Advertisement of the service name '%s' succeeded.\n", SERVICE_NAME);
-    } else {
-        printf("Failed to advertise name '%s' (%s).\n", SERVICE_NAME, QCC_StatusText(status));
+    status = aboutData.SetSoftwareVersion("12.20.44 build 44454");
+    if (status != ER_OK) {
+        return status;
     }
 
-    return status;
-}
+    status = aboutData.SetHardwareVersion("355.499. b");
+    if (status != ER_OK) {
+        return status;
+    }
 
-/** Request the service name, report the result to stdout, and return the status code. */
-QStatus RequestName(void)
-{
-    const uint32_t flags = DBUS_NAME_FLAG_REPLACE_EXISTING | DBUS_NAME_FLAG_DO_NOT_QUEUE;
-    QStatus status = s_msgBus->RequestName(SERVICE_NAME, flags);
+    status = aboutData.SetDeviceName("My device name", "en");
+    if (status != ER_OK) {
+        return status;
+    }
 
-    if (ER_OK == status) {
-        printf("RequestName('%s') succeeded.\n", SERVICE_NAME);
-    } else {
-        printf("RequestName('%s') failed (status=%s).\n", SERVICE_NAME, QCC_StatusText(status));
+    status = aboutData.SetDescription("This is an Alljoyn Application");
+    if (status != ER_OK) {
+        return status;
+    }
+
+    status = aboutData.SetManufacturer("Company");
+    if (status != ER_OK) {
+        return status;
+    }
+
+    status = aboutData.SetSupportUrl("http://www.alljoyn.org");
+    if (status != ER_OK) {
+        return status;
     }
 
     return status;
@@ -174,78 +157,75 @@ void WaitForSigInt(void)
     }
 }
 
-/** Main entry point */
-int main(int argc, char** argv, char** envArg)
+int main(int argc, char**argv, char**envArg) 
 {
+    QStatus status = ER_OK;
+
+    /* Install SIGINT handler so Ctrl + C deallocates memory properly */
+    signal(SIGINT, SigIntHandler);
+
     printf("AllJoyn Library version: %s.\n", ajn::GetVersion());
     printf("AllJoyn Library build info: %s.\n", ajn::GetBuildInfo());
 
-    /* Install SIGINT handler */
-    signal(SIGINT, SigIntHandler);
+    BusAttachment bus("Analytics Service Example", true);
 
-    QStatus status = ER_OK;
-
-    /* Create message bus */
-    s_msgBus = new BusAttachment("myApp", true);
-
-    if (!s_msgBus) {
-        status = ER_OUT_OF_MEMORY;
+    status = bus.Start();
+    if (ER_OK != status) {
+        printf("Start of BusAttachment failed (%s).\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = AnalyticsBusObject::CreateInterface(*s_msgBus, INTERFACE_NAME);
+    status = bus.Connect();
+    if (ER_OK != status) {
+        printf("Failed to connect daemon (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        s_msgBus->RegisterBusListener(s_busListener);
+    MySessionPortListener sessionPortListener;
+    SessionOpts opts(SessionOpts::TRAFFIC_MESSAGES, false, SessionOpts::PROXIMITY_ANY, TRANSPORT_ANY);
+    SessionPort sp = ASSIGNED_SERVICE_PORT;
+    status = bus.BindSessionPort(sp, opts, sessionPortListener);
+    if (ER_OK != status) {
+        printf("Failed to BindSessionPort (%s)", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = StartMessageBus();
+    AboutData aboutData("en");
+
+    status = FillAboutPropertyStoreImplData(aboutData);
+    if (ER_OK != status) {
+        printf("Failed to set aboutData (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    AnalyticsBusObject testObj(*s_msgBus, &devFactory, SERVICE_PATH, INTERFACE_NAME);
+    TellientDevFactory devFactory;
+    AnalyticsBusObject testObj(bus, &devFactory, SERVICE_PATH, INTERFACE_NAME);
 
-    if (ER_OK == status) {
-        status = RegisterBusObject(&testObj);
+    status = testObj.Initialize();
+    if (ER_OK != status) {
+        printf("Failed to initialize testObj (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    if (ER_OK == status) {
-        status = ConnectBusAttachment();
+    status = bus.RegisterBusObject(testObj);
+    if (ER_OK != status) {
+        printf("Failed to register testObj (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
 
-    /*
-     * Advertise this service on the bus.
-     * There are three steps to advertising this service on the bus.
-     * 1) Request a well-known name that will be used by the client to discover
-     *    this service.
-     * 2) Create a session.
-     * 3) Advertise the well-known name.
-     */
-    if (ER_OK == status) {
-        status = RequestName();
-    }
+    AboutObj aboutObj(bus);
 
-    const TransportMask SERVICE_TRANSPORT_TYPE = TRANSPORT_ANY;
-
-    if (ER_OK == status) {
-        status = CreateSession(SERVICE_TRANSPORT_TYPE);
+    status = aboutObj.Announce(ASSIGNED_SERVICE_PORT, aboutData);
+    if (ER_OK != status) {
+        printf("aboutObj.Announce failed (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
     }
-
-    if (ER_OK == status) {
-        status = AdvertiseName(SERVICE_TRANSPORT_TYPE);
-    }
+    printf("up and running\n");
 
     /* Perform the service asynchronously until the user signals for an exit. */
     if (ER_OK == status) {
         WaitForSigInt();
     }
 
-    /* Clean up msg bus */
-    delete s_msgBus;
-    s_msgBus = NULL;
-
-    printf("Basic service exiting with status 0x%04x (%s).\n", status, QCC_StatusText(status));
-
-    return (int) status;
+    return 0;
 }

@@ -35,7 +35,7 @@ QStatus TellientAnalyticsDeviceObject::SendToCloud(qcc::String &post_url,
 {
     CURL *request = curl_easy_init();
     if (!request) {
-	return ER_FAIL;
+        return ER_FAIL;
     }
 
     curl_easy_setopt(request, CURLOPT_URL, post_url.c_str());
@@ -49,7 +49,7 @@ QStatus TellientAnalyticsDeviceObject::SendToCloud(qcc::String &post_url,
     curl_easy_setopt(request, CURLOPT_HTTPHEADER, chunk);
 
     if (CURLE_OK != curl_easy_perform(request)) {
-	return ER_FAIL;
+        return ER_FAIL;
     }
 
     curl_easy_cleanup(request);

@@ -1,7 +1,7 @@
 /******************************************************************************
  *
  *
- * Copyright (c) 2014, AllSeen Alliance. All rights reserved.
+ * Copyright (c) 2009-2014, AllSeen Alliance. All rights reserved.
  *
  *    Permission to use, copy, modify, and/or distribute this software for any
  *    purpose with or without fee is hereby granted, provided that the above
@@ -16,6 +16,11 @@
  *    OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  ******************************************************************************/
 
+/*
+ * this file contains settings for tellient code that may need to be customized
+ * for your environment.
+ */
+
 /* realloc function to use. */
 #define TE_REALLOC realloc
 
@@ -25,7 +30,7 @@
 
 
 /* need to include something that defines realloc, or whatever
- * TE_REALLOC points at.
+ * TE_REALLOC points at.  You can skip this if you set TE_ALLOW_REALLOC to 0.
  */
 #if TE_ALLOW_REALLOC
 #include <stdlib.h>
@@ -45,20 +50,30 @@
 /* If you want to send floats or doubles in your messages, set to 1.
  * the format requires valid IEEE floating point values.
  */
-#ifndef TE_INCLUDE_FLOATING
 #define TE_INCLUDE_FLOATING 1
-#endif
 
-/* If you don't need 64 bit ints, set this to 0.  This can save significant
- * code size on small microcontrollers.
- */
-#ifndef TE_INCLUDE_INT64
-#define TE_INCLUDE_INT64 1
-#endif
 
-/* Set this to the number of bits for the timestamp field.  This must
- * be either 64 or 32, and if 64 TE_INCLUDE_INT64 must be 1.
- * 64 bit timestamps are in milliseconds, and 32 bit timestamps are in
- * seconds.
+/**************************************
+ *
+ * alljoyn component specific settings.
+ *
+ **************************************/
+
+/*
+ * The TelliantAnalyticsDeviceObject will start attempting to push any
+ * batched-up event data when this many bytes have accumulated.
  */
-#define TE_TIMESTAMP_BITS 64
+#define TE_DEVICE_SOFT_CAP_BYTES 16384
+
+/*
+ * If this is >0, the device object will stop accepting events
+ * when this many bytes are accumulated.
+ */
+#define TE_DEVICE_HARD_CAP_BYTES 0
+
+
+/* batch events for up to this long. */
+#define TE_DEVICE_BATCH_MAX_SECONDS 600
+
+
+
