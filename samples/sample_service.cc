@@ -28,19 +28,20 @@
 #include <alljoyn/BusObject.h>
 #include <alljoyn/AboutObj.h>
 #include "TellientAnalytics.h"
+#include "ECDHEKeyXListener.h"
 
 using namespace std;
 using namespace qcc;
 using namespace ajn;
 
 /*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.AnalyticsEventAgent";
+static const char* INTERFACE_NAME = "org.alljoyn.analytics.AnalyticsEventAgent";
 
 /*
  * The service path may be used to help distinguish between multiple
  * instances of services advertising the Analytics interface. A trusted
- * relationship between client and service can be created by adding some
- * type of shared secret on the interface. That is not included in this example.
+ * relationship between client and service can be created by adding a
+ * AuthListener such as the example ECDHEKeyXListener implemented here.
  */
 static const char* SERVICE_PATH = "/analytics/example";
 
@@ -172,6 +173,12 @@ int main(int argc, char**argv, char**envArg)
     status = bus.Start();
     if (ER_OK != status) {
         printf("Start of BusAttachment failed (%s).\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
+    }
+
+    status = bus.EnablePeerSecurity("ALLJOYN_ECDHE_PSK", new ECDHEKeyXListener());
+    if (ER_OK != status) {
+        printf("EnablePeerSecurity failed (%s).\n", QCC_StatusText(status));
         return EXIT_FAILURE;
     }
 
