@@ -34,6 +34,7 @@
 #include <alljoyn/AllJoynStd.h>
 #include <alljoyn/Status.h>
 #include "Analytics.h"
+#include "ECDHEKeyXListener.h"
 
 using namespace std;
 using namespace qcc;
@@ -43,7 +44,7 @@ using namespace ajn;
 static BusAttachment* g_msgBus = NULL;
 
 /*constants*/
-static const char* INTERFACE_NAME = "org.alljoyn.AnalyticsEventAgent";
+static const char* INTERFACE_NAME = "org.allseen.Analytics.AnalyticsEventAgent";
 static const char* SERVICE_PATH = "/analytics/example";
 
 static bool s_joinComplete = false;
@@ -251,6 +252,12 @@ int main(int argc, char** argv, char** envArg)
     status = bus.Start();
     if (ER_OK != status) {
         printf("Failed to start bus attachment (%s)\n", QCC_StatusText(status));
+        return EXIT_FAILURE;
+    }
+
+    status = bus.EnablePeerSecurity("ALLJOYN_ECDHE_PSK", new ECDHEKeyXListener());
+    if (ER_OK != status) {
+        printf("EnablePeerSecurity failed (%s).\n", QCC_StatusText(status));
         return EXIT_FAILURE;
     }
 

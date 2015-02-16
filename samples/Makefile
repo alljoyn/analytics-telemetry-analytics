@@ -63,19 +63,19 @@ $(OBJ_DIR)/TellientSampleHttp.o : TellientSampleHttp.cc
 	mkdir -p $(OBJ_DIR)
 	$(CXX) -c $(CXXFLAGS) -I$(ALLJOYN_DIST)/inc -I../inc -o $@ $<
 
+$(OBJ_DIR)/ECDHEKeyXListener.o : ECDHEKeyXListener.cc ECDHEKeyXListener.h
+	mkdir -p $(OBJ_DIR)
+	$(CXX) -c $(CXXFLAGS) -I$(ALLJOYN_DIST)/inc -I../inc -o $@ $<
+
 $(OBJ_DIR)/teclient.o: teclient.c
 	mkdir -p $(OBJ_DIR)
 	cc -g -c -I$(ALLJOYN_DIST)/inc -I. $^ -o $@
 
-$(BIN_DIR)/test_tado: test_tado.cc $(OBJDIR)/TellientAnalytics.o $(OBJDIR)/TellientSampleHttp.o $(OBJDIR)/teclient.o $(ALLJOYN_LIB)
-	mkdir -p $(BIN_DIR)
-	c++ -o $@ $(CXXFLAGS) -I$(ALLJOYN_DIST)/inc -I../inc $^ -lcurl -lpthread
-
-$(BIN_DIR)/sample_service: sample_service.cc $(OBJ_DIR)/TellientAnalytics.o $(OBJ_DIR)/TellientSampleHttp.o $(OBJ_DIR)/AnalyticsBusObject.o $(OBJ_DIR)/teclient.o $(ALLJOYN_LIB)
+$(BIN_DIR)/sample_service: sample_service.cc $(OBJ_DIR)/TellientAnalytics.o $(OBJ_DIR)/TellientSampleHttp.o $(OBJ_DIR)/AnalyticsBusObject.o $(OBJ_DIR)/ECDHEKeyXListener.o $(OBJ_DIR)/teclient.o $(ALLJOYN_LIB)
 	mkdir -p $(BIN_DIR)
 	c++ -o $@ $(CXXFLAGS) -I$(ALLJOYN_DIST)/inc -I../inc $^ -lcurl -lpthread -lcrypto
 
-$(BIN_DIR)/sample_client: sample_client.cc  Analytics.h $(OBJ_DIR)/teclient.o $(ALLJOYN_LIB)
+$(BIN_DIR)/sample_client: sample_client.cc  Analytics.h $(OBJ_DIR)/ECDHEKeyXListener.o $(OBJ_DIR)/teclient.o $(ALLJOYN_LIB)
 	mkdir -p $(BIN_DIR)
 	c++ -o $@ $(CXXFLAGS) -I$(ALLJOYN_DIST)/inc -I../inc $^ -lpthread -lcrypto
 

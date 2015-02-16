@@ -93,7 +93,7 @@ class AnalyticsBusObject : public ajn::BusObject, ajn::BusListener {
             QStatus status = ER_OK;
             InterfaceDescription *iface = NULL;
             if (!bus.GetInterface(ifname)) {
-                status = bus.CreateInterface(ifname, iface, false);
+                status = bus.CreateInterface(ifname, iface, AJ_IFC_SECURITY_REQUIRED);
                 if (status != ER_OK) {
                     return status;
                 }
